@@ -71,50 +71,45 @@ public:
 private:
   std_msgs::BoolConstPtr enabled_ptr_;
   bool enabled_;
-  bool servo_inited;
+  bool servo_inited_;
 
   ros::NodeHandle nh_;
   ros::NodeHandle nh_priv_;
 
-  ros::Subscriber caminfo_sub;
-  ros::Subscriber enable_sub;
-  ros::Subscriber roi_sub;
-  ros::Subscriber cam_orientation_sub;
+  ros::Subscriber sub_caminfo_;
+  ros::Subscriber sub_enable_;
+  ros::Subscriber sub_roi_;
+  ros::Subscriber sub_cam_orientation_;
 
-  ros::Publisher debug_pub;
-  ros::Publisher cmd_vel_pub;
+  ros::Publisher pub_debug_;
+  ros::Publisher pub_cmd_vel_;
 
-  geometry_msgs::Twist cmd_vel;
-  bebop_vservo::debug debug_msg;
+  geometry_msgs::Twist msg_cmd_vel_;
+  bebop_vservo::debug msg_debug_;
+
   sensor_msgs::RegionOfInterestConstPtr roi_cptr_;
 
   // Internal
-  ros::Time roi_recv_time;
-  double fov_x;
-  double fov_y;
-  image_geometry::PinholeCameraModel cam_model;
-  double cam_tilt_rad;
+  ros::Time roi_recv_time_;
+  double fov_x_;
+  double fov_y_;
+  image_geometry::PinholeCameraModel cam_model_;
+  double cam_tilt_rad_;
 
   // Visp
-  vpServo task;
-  vpFeaturePoint pd[4];
-  vpFeaturePoint p[4];
-  vpCameraParameters cam;
-  double Z, Zd;
-  double lambda;
-  double t_start_loop;
-  double tinit;
-  vpColVector v;
-  vpColVector v_beb;
-  vpColVector vi;
-  double mu;
-  vpAdaptiveGain lambda_adapt;
+  vpServo vp_task_;
+  vpFeaturePoint fpd_[4];
+  vpFeaturePoint fp_[4];
+  vpCameraParameters vp_cam_;
+  double vp_gain_;
+  vpColVector vp_v_;
+  vpAdaptiveGain vp_gain_adapt_;
 
   // params
-  double depth;
-  double height_target_m;
-  double distground_target_m;
-  double update_freq;
+  double param_desired_depth_;
+  double param_target_height_;
+  double param_target_dist_ground_;
+  double param_update_freq_;
 
   void Reset();
   void Update();
