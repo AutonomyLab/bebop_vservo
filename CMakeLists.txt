@@ -6,6 +6,7 @@ find_package(catkin REQUIRED COMPONENTS
   bebop_msgs
   geometry_msgs
   image_transport
+  image_geometry
   nodelet
   roscpp
   sensor_msgs

@@ -2,6 +2,7 @@
 #define BEBOP_VSERVO_NODELET_H
 
 // boost
+#include <boost/thread.hpp>
 #include <boost/shared_ptr.hpp>
 
 // ros
@@ -69,10 +70,18 @@ class BebopVServoNodelet: public nodelet::Nodelet
 {
 public:
   BebopVServoNodelet();
+  virtual ~BebopVServoNodelet();
 
 private:
+  std_msgs::BoolConstPtr enabled_ptr_;
   bool enabled_;
   bool servo_inited;
+
+  boost::shared_ptr<boost::thread> ctrlloop_thread_ptr_;
+
+  boost::mutex mutex_enable_;
+  boost::mutex mutex_roi_;
+  boost::mutex mutex_servo;
 
   ros::NodeHandle nh_;
   ros::NodeHandle private_nh_;
@@ -87,10 +96,9 @@ private:
 
   geometry_msgs::Twist cmd_vel;
   bebop_vservo::debug debug_msg;
-  sensor_msgs::RegionOfInterest roi;
+  sensor_msgs::RegionOfInterestConstPtr roi_cptr_;
 
   // Internal
-  bool cinfo_recv;
   ros::Time roi_recv_time;
   double fov_x;
   double fov_y;
@@ -116,8 +124,10 @@ private:
   double depth;
   double height_target_m;
   double distground_target_m;
-  double safety_timeout_;
+  double update_freq;
 
+  void Reset();
+  void ControlLoopThread();
   void CameraOrientationCallback(const bebop_msgs::Ardrone3CameraStateOrientationConstPtr& cam_ori_ptr);
   void CameraCallback(const sensor_msgs::ImageConstPtr& img_ptr, const sensor_msgs::CameraInfoConstPtr& cinfo_msg_ptr);
   void RoiCallback(const sensor_msgs::RegionOfInterestConstPtr& roi_msg_ptr);
