@@ -5,9 +5,7 @@ find_package(catkin REQUIRED COMPONENTS
   message_generation
   bebop_msgs
   geometry_msgs
-  image_transport
   image_geometry
-  nodelet
   roscpp
   sensor_msgs
   visp_bridge
@@ -80,8 +78,8 @@ generate_messages(
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
    INCLUDE_DIRS include
-   LIBRARIES bebop_vservo_nodelet
-   CATKIN_DEPENDS bebop_msgs geometry_msgs image_transport nodelet roscpp sensor_msgs std_msgs vision_visp visp message_runtime
+   # LIBRARIES 
+   CATKIN_DEPENDS bebop_msgs geometry_msgs roscpp sensor_msgs std_msgs vision_visp visp message_runtime
    DEPENDS visp
 )
 
@@ -98,19 +96,7 @@ include_directories(
   ${catkin_INCLUDE_DIRS}
 )
 
-# Declare a C++ library
-add_library(bebop_vservo_nodelet
-  src/bebop_vservo_nodelet.cpp
-)
-
-add_dependencies(bebop_vservo_nodelet ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
-
-target_link_libraries(bebop_vservo_nodelet
-  ${catkin_LIBRARIES}
-  ${VISP_LIBRARIES}
-)
-
-add_executable(bebop_vservo_node src/bebop_vservo_node.cpp)
+add_executable(bebop_vservo_node src/bebop_vservo_node.cpp src/bebop_vservo_ctrl.cpp)
 
 add_dependencies(bebop_vservo_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 

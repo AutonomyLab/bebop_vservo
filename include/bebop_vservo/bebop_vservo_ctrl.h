@@ -1,15 +1,11 @@
-#ifndef BEBOP_VSERVO_NODELET_H
-#define BEBOP_VSERVO_NODELET_H
+#ifndef BEBOP_VSERVO_CTRL_H
+#define BEBOP_VSERVO_CTRL_H
 
 // boost
-#include <boost/thread.hpp>
 #include <boost/shared_ptr.hpp>
 
 // ros
 #include <ros/node_handle.h>
-#include <nodelet/nodelet.h>
-#include <image_transport/image_transport.h>
-#include <sensor_msgs/Image.h>
 #include <sensor_msgs/CameraInfo.h>
 #include <sensor_msgs/RegionOfInterest.h>
 #include <geometry_msgs/Twist.h>
@@ -66,30 +62,24 @@ bool GetParam(const ros::NodeHandle& nh, const::std::string& key, T& val, const 
 
 }  // namespace util
 
-class BebopVServoNodelet: public nodelet::Nodelet
+class BebopVServoCtrl
 {
 public:
-  BebopVServoNodelet();
-  virtual ~BebopVServoNodelet();
+  explicit BebopVServoCtrl(ros::NodeHandle &nh);
+  virtual void Spin();
 
 private:
   std_msgs::BoolConstPtr enabled_ptr_;
   bool enabled_;
   bool servo_inited;
 
-  boost::shared_ptr<boost::thread> ctrlloop_thread_ptr_;
-
-  boost::mutex mutex_enable_;
-  boost::mutex mutex_roi_;
-  boost::mutex mutex_servo;
-
   ros::NodeHandle nh_;
-  ros::NodeHandle private_nh_;
-  boost::shared_ptr<image_transport::ImageTransport> it_ptr_;
+  ros::NodeHandle nh_priv_;
+
+  ros::Subscriber caminfo_sub;
   ros::Subscriber enable_sub;
   ros::Subscriber roi_sub;
   ros::Subscriber cam_orientation_sub;
-  image_transport::CameraSubscriber camera_sub;
 
   ros::Publisher debug_pub;
   ros::Publisher cmd_vel_pub;
@@ -127,17 +117,14 @@ private:
   double update_freq;
 
   void Reset();
-  void ControlLoopThread();
+  void Update();
+
   void CameraOrientationCallback(const bebop_msgs::Ardrone3CameraStateOrientationConstPtr& cam_ori_ptr);
-  void CameraCallback(const sensor_msgs::ImageConstPtr& img_ptr, const sensor_msgs::CameraInfoConstPtr& cinfo_msg_ptr);
+  void CameraCallback(const sensor_msgs::CameraInfoConstPtr& cinfo_msg_ptr);
   void RoiCallback(const sensor_msgs::RegionOfInterestConstPtr& roi_msg_ptr);
   void EnableCallback(const std_msgs::BoolConstPtr& enable_msg_ptr);
 
   void UpdateParams();
-
-protected:
-  virtual void onInit();
-
 };
 
 }  // namespace bebop_vservo
