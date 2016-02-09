@@ -1,0 +1,5 @@
+<library path="lib/libbebop_vservo_nodelet">
+  <class name="bebop_vservo/BebopVServoNodelet" type="bebop_vservo::BebopVServoNodelet" base_class_type="nodelet::Nodelet">
+    <description>Nodelet implementation of Bebop Visual Servo</description>
+  </class>
+</library>
