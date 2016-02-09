@@ -51,7 +51,7 @@ void BebopVServoCtrl::UpdateParams()
 void BebopVServoCtrl::EnableCallback(const std_msgs::BoolConstPtr &enable_msg_ptr)
 {
   enabled_ptr_ = enable_msg_ptr;
-  ROS_INFO_STREAM("[VSER] Enable request: " << enable_msg_ptr->data);
+  ROS_INFO_STREAM("[VSER] request: " << (enable_msg_ptr->data ? "enable" : "disable"));
 }
 
 void BebopVServoCtrl::RoiCallback(const sensor_msgs::RegionOfInterestConstPtr& roi_msg_ptr)
@@ -149,6 +149,7 @@ void BebopVServoCtrl::Spin()
   {
     try
     {
+      ros::spinOnce();
       if (!loop_rate.sleep())
       {
         throw std::runtime_error("[VSER] Missed target frequency");
@@ -164,7 +165,7 @@ void BebopVServoCtrl::Spin()
         ROS_WARN_THROTTLE(1, "[VSER] Not enabled ...");
         continue;
       }
-      Update();
+      if (!Update()) Reset();
     }
     catch (const vpException& e)
     {
@@ -184,8 +185,14 @@ void BebopVServoCtrl::Spin()
   }
 }
 
-void BebopVServoCtrl::Update()
+bool BebopVServoCtrl::Update()
 {
+  if (!servo_inited_)
+  {
+    ROS_WARN_THROTTLE(1, "[VSER] Servo task has not been initialized yet.");
+    return false;
+  }
+
   bool is_valid_roi = (ros::Time::now() - roi_recv_time_).toSec() < (5.0 / param_update_freq_);
   sensor_msgs::RegionOfInterest roi;
   if (is_valid_roi && roi_cptr_) roi = *roi_cptr_;
@@ -199,8 +206,7 @@ void BebopVServoCtrl::Update()
   if (!is_valid_roi)
   {
     ROS_WARN_THROTTLE(1, "[VSER] ROI is too old or not valid");
-    Reset();
-    return;
+    return false;
   }
   const double im_width_px = static_cast<double>(cam_model_.fullResolution().width);
   const double im_height_px = static_cast<double>(cam_model_.fullResolution().height);

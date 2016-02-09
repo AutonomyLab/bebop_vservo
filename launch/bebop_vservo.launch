@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<launch>
+  <arg name="config_file" default="$(find bebop_vservo)/config/bebop_vservo.yaml" />
+  <arg name="output" default="screen" />
+  <arg name="caminfo_topic" default="bebop/camera_info" />
+  <arg name="cmd_vel_topic" default="vservo/cmd_vel" />
+
+  <node name="bebop_vservo_node" type="bebop_vservo_node" pkg="bebop_vservo" output="$(arg output)">
+    <rosparam command="load" file="$(arg config_file)" />
+    <remap from="cmd_vel" to="$(arg cmd_vel_topic)" />
+    <remap from="bebop/camera_info" to="$(arg caminfo_topic)" />
+  </node>
+</launch>

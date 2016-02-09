@@ -112,7 +112,7 @@ private:
   double param_update_freq_;
 
   void Reset();
-  void Update();
+  bool Update();
 
   void CameraOrientationCallback(const bebop_msgs::Ardrone3CameraStateOrientationConstPtr& cam_ori_ptr);
   void CameraCallback(const sensor_msgs::CameraInfoConstPtr& cinfo_msg_ptr);
