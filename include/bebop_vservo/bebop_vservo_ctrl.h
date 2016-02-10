@@ -70,7 +70,6 @@ public:
   virtual void Spin();
 
 private:
-  std_msgs::BoolConstPtr enabled_ptr_;
   bool enabled_;
   bool servo_inited_;
 

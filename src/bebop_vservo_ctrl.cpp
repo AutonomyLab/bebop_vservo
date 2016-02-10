@@ -48,8 +48,8 @@ void BebopVServoCtrl::UpdateParams()
 
 void BebopVServoCtrl::EnableCallback(const std_msgs::BoolConstPtr &enable_msg_ptr)
 {
-  enabled_ptr_ = enable_msg_ptr;
-  ROS_INFO_STREAM("[VSER] request: " << (enable_msg_ptr->data ? "enable" : "disable"));
+  enabled_ = enable_msg_ptr->data;
+  ROS_INFO_STREAM("[VSER] request: " << (enabled_ ? "enable" : "disable"));
 }
 
 void BebopVServoCtrl::TargetCallback(const TargetConstPtr target_msg_ptr)
@@ -138,7 +138,7 @@ void BebopVServoCtrl::CameraCallback(const sensor_msgs::CameraInfoConstPtr& cinf
     servo_inited_ = true;
   }
 
-  if (!servo_inited_)
+  if (!servo_inited_ && enabled_)
   {
     ROS_WARN_THROTTLE(1, "[VSER] Wating for the first roi ...");
   }
@@ -163,11 +163,6 @@ void BebopVServoCtrl::Spin()
       if (!loop_rate.sleep())
       {
         throw std::runtime_error("[VSER] Missed target frequency");
-      }
-
-      if (enabled_ptr_)
-      {
-        enabled_ = enabled_ptr_->data;
       }
 
       if (!enabled_)
@@ -215,7 +210,10 @@ bool BebopVServoCtrl::Update()
 
   if (!is_valid_roi)
   {
-    ROS_WARN_THROTTLE(1, "[VSER] ROI is too old or not valid");
+    ROS_WARN_THROTTLE(1, "[VSER] ROI is too old or not valid. Disabling visual servo!");
+    // Experimental
+    enabled_ = false;
+    servo_inited_ = false;
     return false;
   }
 
