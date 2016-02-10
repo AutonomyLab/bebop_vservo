@@ -21,7 +21,8 @@
 
 
 // bebop_vservo
-#include "bebop_vservo/debug.h"
+#include "bebop_vservo/Debug.h"
+#include "bebop_vservo/Target.h"
 
 #ifndef CLAMP
 #define CLAMP(x, l, h) (((x) > (h)) ? (h) : (((x) < (l)) ? (l) : (x)))
@@ -85,12 +86,12 @@ private:
   ros::Publisher pub_cmd_vel_;
 
   geometry_msgs::Twist msg_cmd_vel_;
-  bebop_vservo::debug msg_debug_;
+  bebop_vservo::Debug msg_debug_;
 
-  sensor_msgs::RegionOfInterestConstPtr roi_cptr_;
+  bebop_vservo::TargetConstPtr target_cptr_;
 
   // Internal
-  ros::Time roi_recv_time_;
+  ros::Time target_recv_time_;
   double fov_x_;
   double fov_y_;
   image_geometry::PinholeCameraModel cam_model_;
@@ -105,10 +106,13 @@ private:
   vpColVector vp_v_;
   vpAdaptiveGain vp_gain_adapt_;
 
+  // These are set by the user when target is first received or when reinit=true
+  double servo_desired_depth_;
+  double servo_target_height_;
+  double servo_target_dist_ground_;
+  double servo_desired_yaw_rad_;
+
   // params
-  double param_desired_depth_;
-  double param_target_height_;
-  double param_target_dist_ground_;
   double param_update_freq_;
 
   void Reset();
@@ -116,7 +120,7 @@ private:
 
   void CameraOrientationCallback(const bebop_msgs::Ardrone3CameraStateOrientationConstPtr& cam_ori_ptr);
   void CameraCallback(const sensor_msgs::CameraInfoConstPtr& cinfo_msg_ptr);
-  void RoiCallback(const sensor_msgs::RegionOfInterestConstPtr& roi_msg_ptr);
+  void TargetCallback(const bebop_vservo::TargetConstPtr target_msg_ptr);
   void EnableCallback(const std_msgs::BoolConstPtr& enable_msg_ptr);
 
   void UpdateParams();

@@ -6,12 +6,14 @@
   <arg name="cmd_vel_topic" default="vservo/cmd_vel" />
   <arg name="enable_topic" default="vservo/enable" />
   <arg name="roi_topic" default="vservo/roi" />
+  <arg name="debug_topic" default="vservo/debug" />
 
   <node name="bebop_vservo_node" type="bebop_vservo_node" pkg="bebop_vservo" output="$(arg output)">
     <rosparam command="load" file="$(arg param_file)" />
     <remap from="cmd_vel" to="$(arg cmd_vel_topic)" />
     <remap from="bebop/camera_info" to="$(arg caminfo_topic)" />
     <remap from="enable" to="$(arg enable_topic)" />
+    <remap from="debug" to="$(arg debug_topic)" />
     <remap from="track_roi" to="$(arg roi_topic)" />
   </node>
 </launch>

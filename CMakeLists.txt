@@ -25,7 +25,8 @@ message(STATUS "VISP libraries: ${VISP_LIBRARIES}")
 ## Generate messages in the 'msg' folder
 add_message_files(
   FILES
-  debug.msg
+  Debug.msg
+  Target.msg
 )
 
 ## Generate services in the 'srv' folder
@@ -45,6 +46,7 @@ add_message_files(
 generate_messages(
   DEPENDENCIES
   std_msgs
+  sensor_msgs
 )
 
 ################################################

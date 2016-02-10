@@ -24,10 +24,11 @@ BebopVServoCtrl::BebopVServoCtrl(ros::NodeHandle &nh)
     sub_caminfo_(nh.subscribe("bebop/camera_info", 1, &BebopVServoCtrl::CameraCallback, this)),
     sub_cam_orientation_(nh_.subscribe("bebop/states/ARDrone3/CameraState/Orientation", 10
                                       , &BebopVServoCtrl::CameraOrientationCallback, this)),
-    sub_roi_(nh_.subscribe("track_roi", 1, &BebopVServoCtrl::RoiCallback, this)),
+    sub_roi_(nh_.subscribe("track_roi", 1, &BebopVServoCtrl::TargetCallback, this)),
     sub_enable_(nh_.subscribe("enable", 1, &BebopVServoCtrl::EnableCallback, this)),
     pub_cmd_vel_(nh_.advertise<geometry_msgs::Twist>("cmd_vel", 10)),
-    roi_recv_time_(ros::Time(0)),
+    pub_debug_(nh_.advertise<bebop_vservo::Debug>("debug", 30)),
+    target_recv_time_(ros::Time(0)),
     fov_x_(0.0),
     fov_y_(0.0),
     cam_tilt_rad_(0.0)
@@ -38,12 +39,9 @@ BebopVServoCtrl::BebopVServoCtrl(ros::NodeHandle &nh)
 
 void BebopVServoCtrl::UpdateParams()
 {
-  util::GetParam(nh_priv_, "desired_depth", param_desired_depth_, 2.5);
   util::GetParam(nh_priv_, "start_enabled", enabled_, false);
   util::GetParam(nh_priv_, "servo_gain", vp_gain_, 0.4);
   util::GetParam(nh_priv_, "update_freq", param_update_freq_, 30.0);
-  util::GetParam(nh_priv_, "height_target", param_target_height_, 0.5);
-  util::GetParam(nh_priv_, "distground_target", param_target_dist_ground_, 0.75);
   util::GetParam(nh_priv_, "cam_tilt", cam_tilt_rad_, 0.0);
   cam_tilt_rad_ = angles::from_degrees(cam_tilt_rad_);
 }
@@ -54,10 +52,10 @@ void BebopVServoCtrl::EnableCallback(const std_msgs::BoolConstPtr &enable_msg_pt
   ROS_INFO_STREAM("[VSER] request: " << (enable_msg_ptr->data ? "enable" : "disable"));
 }
 
-void BebopVServoCtrl::RoiCallback(const sensor_msgs::RegionOfInterestConstPtr& roi_msg_ptr)
+void BebopVServoCtrl::TargetCallback(const TargetConstPtr target_msg_ptr)
 {
-  roi_cptr_ = roi_msg_ptr;
-  roi_recv_time_ = ros::Time::now();
+  target_cptr_ = target_msg_ptr;
+  target_recv_time_ = ros::Time::now();
 }
 
 void BebopVServoCtrl::CameraOrientationCallback(const bebop_msgs::Ardrone3CameraStateOrientationConstPtr& cam_ori_ptr)
@@ -73,9 +71,9 @@ void BebopVServoCtrl::CameraCallback(const sensor_msgs::CameraInfoConstPtr& cinf
   fov_y_ = 2.0 * atan2(cam_model_.fullResolution().height/ 2.0, cam_model_.fy());
   ROS_INFO_STREAM_ONCE("[VSER] FOV " << angles::to_degrees(fov_x_) << " " << angles::to_degrees(fov_y_));
 
-  bool is_valid_roi = (ros::Time::now() - roi_recv_time_).toSec() < (5.0 / param_update_freq_);
+  bool is_valid_roi = (ros::Time::now() - target_recv_time_).toSec() < (5.0 / param_update_freq_);
   sensor_msgs::RegionOfInterest roi;
-  if (is_valid_roi && roi_cptr_) roi = *roi_cptr_;
+  if (is_valid_roi && target_cptr_) roi = target_cptr_->roi;
   if (roi.width < 5 || roi.height < 5 ||
       (roi.x_offset + roi.width >= cam_model_.fullResolution().width) ||
       (roi.y_offset + roi.width >= cam_model_.fullResolution().height))
@@ -83,8 +81,20 @@ void BebopVServoCtrl::CameraCallback(const sensor_msgs::CameraInfoConstPtr& cinf
     is_valid_roi = false;
   }
 
-  if (!servo_inited_ && is_valid_roi)
+  if (is_valid_roi && (!servo_inited_ || target_cptr_->reinit))
   {
+    servo_desired_depth_ = target_cptr_->desired_depth;
+    servo_desired_yaw_rad_ = target_cptr_->desired_yaw_rad;
+    servo_target_height_ = target_cptr_->target_height;
+    servo_target_dist_ground_ = target_cptr_->target_distance_ground;
+
+    ROS_WARN_STREAM("[VSER] (re-)init " <<
+                    "Desired depth: " << servo_desired_depth_ <<
+                    "Desired yaw:" << angles::to_degrees(servo_desired_yaw_rad_) <<
+                    "Target height: " << servo_target_height_ <<
+                    "Target d2 ground: " << servo_target_dist_ground_
+                    );
+
     vp_cam_ = visp_bridge::toVispCameraParameters(*cinfo_msg_ptr);
     vp_cam_.printParameters();
     //lambda_adapt.initStandard(4.0, 0.4, 40.0);
@@ -95,14 +105,14 @@ void BebopVServoCtrl::CameraCallback(const sensor_msgs::CameraInfoConstPtr& cinf
     vpFeatureBuilder::create(fp_[3], vp_cam_, vpImagePoint(roi.y_offset + roi.height, roi.x_offset));
 
     vpPoint point[4];
-    const double tw = param_target_height_ / 2.0;
+    const double tw = servo_target_height_ / 2.0;
     point[0].setWorldCoordinates(-tw, -tw, 0);
     point[1].setWorldCoordinates( tw, -tw, 0);
     point[2].setWorldCoordinates( tw,  tw, 0);
     point[3].setWorldCoordinates(-tw,  tw, 0);
 
     vpHomogeneousMatrix cMo;
-    vpTranslationVector cto(0, 0, param_desired_depth_);
+    vpTranslationVector cto(0, 0, servo_desired_depth_);
     vpRxyzVector cro(vpMath::rad(0.0), vpMath::rad(0.0), vpMath::rad(0.0));
     vpRotationMatrix cRo(cro);
     cMo.buildFrom(cto, cRo);
@@ -193,9 +203,9 @@ bool BebopVServoCtrl::Update()
     return false;
   }
 
-  bool is_valid_roi = (ros::Time::now() - roi_recv_time_).toSec() < (5.0 / param_update_freq_);
+  bool is_valid_roi = (ros::Time::now() - target_recv_time_).toSec() < (5.0 / param_update_freq_);
   sensor_msgs::RegionOfInterest roi;
-  if (is_valid_roi && roi_cptr_) roi = *roi_cptr_;
+  if (is_valid_roi && target_cptr_) roi = target_cptr_->roi;
   if (roi.width < 5 || roi.height < 5 ||
       (roi.x_offset + roi.width >= cam_model_.fullResolution().width) ||
       (roi.y_offset + roi.width >= cam_model_.fullResolution().height))
@@ -214,7 +224,7 @@ bool BebopVServoCtrl::Update()
   double sigma_2 = (im_height_px - static_cast<double>(roi.y_offset + roi.height)) / im_height_px * fov_y_;
   double roi_height_px = roi.height;
   double beta_rad = (roi_height_px / im_height_px) * fov_y_;
-  double d1_m = param_target_height_ * sin(M_PI_2 - fov_y_/2.0 + sigma_2 - cam_tilt_rad_) / sin(beta_rad);
+  double d1_m = servo_target_height_ * sin(M_PI_2 - fov_y_/2.0 + sigma_2 - cam_tilt_rad_) / sin(beta_rad);
   double z1_m = d1_m * sin(M_PI_2 + fov_y_/2.0  - cam_tilt_rad_ - sigma_1);
   vpFeatureBuilder::create(fp_[0], vp_cam_, vpImagePoint(roi.y_offset, roi.x_offset));
   vpFeatureBuilder::create(fp_[1], vp_cam_, vpImagePoint(roi.y_offset, roi.x_offset + roi.width));
@@ -226,8 +236,8 @@ bool BebopVServoCtrl::Update()
     fp_[i].set_Z(z1_m);
   }
   vp_v_ = vp_task_.computeControlLaw();
-  vp_task_.print();
-  ROS_WARN_STREAM("V_SERVO\n" << vp_v_);
+  //vp_task_.print();
+  ROS_WARN_STREAM("V_SERVO: " << vp_v_.transpose());
 
   // Here we should convert from Camera (Visp) coordinates to Bebop Coordinates
   // TODO: Consider camera tilt
@@ -240,9 +250,24 @@ bool BebopVServoCtrl::Update()
   msg_cmd_vel_.linear.x = vp_v_[2];
   msg_cmd_vel_.linear.y = -vp_v_[0];
   msg_cmd_vel_.linear.z = -vp_v_[1];
-  msg_cmd_vel_.angular.z = -vp_v_[4];
+
+  // We can't control all four DOF of the vehicle
+  msg_cmd_vel_.angular.z = servo_desired_yaw_rad_;
 
   pub_cmd_vel_.publish(msg_cmd_vel_);
+
+  msg_debug_.header.stamp = ros::Time::now();
+  msg_debug_.header.frame_id = "";
+  msg_debug_.bb_height = roi_height_px;
+  //msg_debug_.d_groundtruth = d_truth;
+  msg_debug_.cam_tilt = angles::to_degrees(cam_tilt_rad_);
+  msg_debug_.beta = beta_rad;
+  msg_debug_.sigma_1 = sigma_1;
+  msg_debug_.sigma_2 = sigma_2;
+  msg_debug_.d_raw_bb = z1_m;
+  msg_debug_.target_height = servo_target_height_;
+  msg_debug_.target_grounddist = servo_target_dist_ground_;
+  pub_debug_.publish(msg_debug_);
 }
 
 }  // namespace bebop_servo
