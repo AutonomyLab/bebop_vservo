@@ -24,7 +24,7 @@ BebopVServoCtrl::BebopVServoCtrl(ros::NodeHandle &nh)
     sub_caminfo_(nh.subscribe("bebop/camera_info", 1, &BebopVServoCtrl::CameraCallback, this)),
     sub_cam_orientation_(nh_.subscribe("bebop/states/ARDrone3/CameraState/Orientation", 10
                                       , &BebopVServoCtrl::CameraOrientationCallback, this)),
-    sub_roi_(nh_.subscribe("track_roi", 1, &BebopVServoCtrl::TargetCallback, this)),
+    sub_roi_(nh_.subscribe("target", 1, &BebopVServoCtrl::TargetCallback, this)),
     sub_enable_(nh_.subscribe("enable", 1, &BebopVServoCtrl::EnableCallback, this)),
     pub_cmd_vel_(nh_.advertise<geometry_msgs::Twist>("cmd_vel", 10)),
     pub_debug_(nh_.advertise<bebop_vservo::Debug>("debug", 30)),
@@ -61,7 +61,7 @@ void BebopVServoCtrl::TargetCallback(const TargetConstPtr target_msg_ptr)
 void BebopVServoCtrl::CameraOrientationCallback(const bebop_msgs::Ardrone3CameraStateOrientationConstPtr& cam_ori_ptr)
 {
   cam_tilt_rad_ = -angles::from_degrees(cam_ori_ptr->tilt);
-  ROS_INFO_STREAM("[VSER] Bebop camera's new tilt: " << -cam_ori_ptr->tilt);
+  ROS_DEBUG_STREAM("[VSER] Bebop camera's new tilt: " << -cam_ori_ptr->tilt);
 }
 
 void BebopVServoCtrl::CameraCallback(const sensor_msgs::CameraInfoConstPtr& cinfo_msg_ptr)
@@ -172,7 +172,7 @@ void BebopVServoCtrl::Spin()
 
       if (!enabled_)
       {
-        ROS_WARN_THROTTLE(1, "[VSER] Not enabled ...");
+        ROS_WARN_THROTTLE(10, "[VSER] Not enabled ...");
         continue;
       }
       if (!Update()) Reset();
@@ -218,6 +218,7 @@ bool BebopVServoCtrl::Update()
     ROS_WARN_THROTTLE(1, "[VSER] ROI is too old or not valid");
     return false;
   }
+
   const double im_width_px = static_cast<double>(cam_model_.fullResolution().width);
   const double im_height_px = static_cast<double>(cam_model_.fullResolution().height);
   double sigma_1 = static_cast<double>(roi.y_offset) / im_height_px * fov_y_;

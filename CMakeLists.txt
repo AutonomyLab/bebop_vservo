@@ -81,7 +81,7 @@ generate_messages(
 catkin_package(
    INCLUDE_DIRS include
    # LIBRARIES 
-   CATKIN_DEPENDS bebop_msgs geometry_msgs roscpp sensor_msgs std_msgs vision_visp visp message_runtime
+   CATKIN_DEPENDS bebop_msgs geometry_msgs roscpp sensor_msgs std_msgs message_runtime
    DEPENDS visp
 )
 
