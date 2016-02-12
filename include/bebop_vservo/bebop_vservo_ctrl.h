@@ -12,6 +12,7 @@
 #include <image_geometry/pinhole_camera_model.h>
 #include <std_msgs/Bool.h>
 
+#include "bebop_msgs/Ardrone3PilotingStateAttitudeChanged.h"
 #include "bebop_msgs/Ardrone3CameraStateOrientation.h"
 
 // visp && visp_bridge
@@ -71,6 +72,7 @@ public:
 
 private:
   bool enabled_;
+  bool caminfo_recv_;
   bool servo_inited_;
   bool force_reinit_;
 
@@ -81,6 +83,7 @@ private:
   ros::Subscriber sub_enable_;
   ros::Subscriber sub_roi_;
   ros::Subscriber sub_cam_orientation_;
+  ros::Subscriber sub_bebop_att_;
 
   ros::Publisher pub_debug_;
   ros::Publisher pub_cmd_vel_;
@@ -92,10 +95,13 @@ private:
 
   // Internal
   ros::Time target_recv_time_;
+  ros::Time bebop_recv_time_;
+
   double fov_x_;
   double fov_y_;
   image_geometry::PinholeCameraModel cam_model_;
   double cam_tilt_rad_;
+  double bebop_yaw_rad_;
 
   // Visp
   boost::shared_ptr<vpServo> vp_task_ptr_;
@@ -119,8 +125,9 @@ private:
   void Reset();
   bool Update();
 
+  void BebopAttitudeCallback(const bebop_msgs::Ardrone3PilotingStateAttitudeChangedConstPtr& att_ptr);
   void CameraOrientationCallback(const bebop_msgs::Ardrone3CameraStateOrientationConstPtr& cam_ori_ptr);
-  void CameraCallback(const sensor_msgs::CameraInfoConstPtr& cinfo_msg_ptr);
+  void CameraCallback(const sensor_msgs::CameraInfoConstPtr& msg_ptr);
   void TargetCallback(const bebop_vservo::TargetConstPtr target_msg_ptr);
   void EnableCallback(const std_msgs::BoolConstPtr& enable_msg_ptr);
 

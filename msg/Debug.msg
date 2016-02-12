@@ -14,5 +14,6 @@ uint16  bb_height
 
 float32[6] v_img
 
+sensor_msgs/RegionOfInterest target_roi
 float32 desired_depth
 float32 desired_yaw_rad
