@@ -1,23 +1,18 @@
 Header header
 
-float64 d_groundtruth
-float64 d_raw_bb
-float64 d_raw_alt
-float64 bebop_alt
-float64 beta
-float64 sigma_1
-float64 sigma_2
-float64 cam_tilt
-float64 target_height
-float64 target_grounddist
+float32 d_groundtruth
+float32 d_raw_bb
+float32 d_raw_alt
+float32 bebop_alt
+float32 beta
+float32 sigma_1
+float32 sigma_2
+float32 cam_tilt
+float32 target_height
+float32 target_grounddist
 uint16  bb_height
 
-float64 vref_x
-float64 vref_y
-float64 vref_z
-float64 vref_yaw
+float32[6] v_img
 
-float64 vest_x
-float64 vest_y
-
-float64[6] task_err
+float32 desired_depth
+float32 desired_yaw_rad

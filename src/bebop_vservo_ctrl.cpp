@@ -19,6 +19,7 @@ namespace bebop_vservo
 BebopVServoCtrl::BebopVServoCtrl(ros::NodeHandle &nh)
   : enabled_(false),
     servo_inited_(false),
+    force_reinit_(false),
     nh_(nh),
     nh_priv_("~"),
     sub_caminfo_(nh.subscribe("bebop/camera_info", 1, &BebopVServoCtrl::CameraCallback, this)),
@@ -56,6 +57,7 @@ void BebopVServoCtrl::EnableCallback(const std_msgs::BoolConstPtr &enable_msg_pt
 void BebopVServoCtrl::TargetCallback(const TargetConstPtr target_msg_ptr)
 {
   target_cptr_ = target_msg_ptr;
+  force_reinit_ = static_cast<bool>(target_msg_ptr->reinit);
   target_recv_time_ = ros::Time::now();
 }
 
@@ -72,7 +74,8 @@ void BebopVServoCtrl::CameraCallback(const sensor_msgs::CameraInfoConstPtr& cinf
   fov_y_ = 2.0 * atan2(cam_model_.fullResolution().height/ 2.0, cam_model_.fy());
   ROS_INFO_STREAM_ONCE("[VSER] FOV " << angles::to_degrees(fov_x_) << " " << angles::to_degrees(fov_y_));
 
-  bool is_valid_roi = (ros::Time::now() - target_recv_time_).toSec() < (5.0 / param_update_freq_);
+  //bool is_valid_roi = (ros::Time::now() - target_recv_time_).toSec() < (5.0 / param_update_freq_);
+  bool is_valid_roi = (ros::Time::now() - target_recv_time_).toSec() < 2.0;
   sensor_msgs::RegionOfInterest roi;
   if (is_valid_roi && target_cptr_) roi = target_cptr_->roi;
   if (roi.width < 5 || roi.height < 5 ||
@@ -82,10 +85,11 @@ void BebopVServoCtrl::CameraCallback(const sensor_msgs::CameraInfoConstPtr& cinf
     is_valid_roi = false;
   }
 
-  if (is_valid_roi && (!servo_inited_ || target_cptr_->reinit))
+  if (is_valid_roi && (!servo_inited_ || force_reinit_))
   {
     // This will re-set all internal params of the task
     vp_task_ptr_ = boost::make_shared<vpServo>();
+    servo_inited_ = false;
 
     servo_desired_depth_ = target_cptr_->desired_depth;
     servo_desired_yaw_rad_ = target_cptr_->desired_yaw_rad;
@@ -93,13 +97,15 @@ void BebopVServoCtrl::CameraCallback(const sensor_msgs::CameraInfoConstPtr& cinf
     servo_target_dist_ground_ = target_cptr_->target_distance_ground;
 
     ROS_WARN_STREAM("[VSER] (re-)init " <<
-                    "Desired depth: " << servo_desired_depth_ <<
-                    "Desired yaw:" << angles::to_degrees(servo_desired_yaw_rad_) <<
-                    "Target height: " << servo_target_height_ <<
-                    "Target d2 ground: " << servo_target_dist_ground_
+                    " is_valid_roi: " << (is_valid_roi ? "yes" : "no") <<
+                    " re-init request: " << (force_reinit_ ? "yes" : "no") <<
+                    " Desired depth: " << servo_desired_depth_ <<
+                    " Desired yaw: " << angles::to_degrees(servo_desired_yaw_rad_) <<
+                    " Target height: " << servo_target_height_ <<
+                    " Target d2 ground: " << servo_target_dist_ground_
                     );
 
-    ROS_ERROR_STREAM("[VSER] Target ROI [x,y,w,h]: " << roi.x_offset << " " << roi.y_offset << " " << roi.width << " " << roi.height);
+    ROS_WARN_STREAM("[VSER] Target ROI [x,y,w,h]: " << roi.x_offset << " " << roi.y_offset << " " << roi.width << " " << roi.height);
     vp_cam_ = visp_bridge::toVispCameraParameters(*cinfo_msg_ptr);
     vp_cam_.printParameters();
     //lambda_adapt.initStandard(4.0, 0.4, 40.0);
@@ -143,6 +149,7 @@ void BebopVServoCtrl::CameraCallback(const sensor_msgs::CameraInfoConstPtr& cinf
     vp_task_ptr_->setLambda(vp_gain_);
     vp_task_ptr_->print();
     servo_inited_ = true;
+    force_reinit_ = false;
   }
 
   if (!servo_inited_ && enabled_)
@@ -274,7 +281,10 @@ bool BebopVServoCtrl::Update()
   msg_debug_.target_height = servo_target_height_;
   msg_debug_.target_grounddist = servo_target_dist_ground_;
   for (uint32_t i = 0; i < 6; ++i)
-    msg_debug_.task_err[i] = vp_v_.data[i];
+    msg_debug_.v_img[i] = vp_v_.data[i];
+
+  msg_debug_.desired_depth = servo_desired_depth_;
+  msg_debug_.desired_yaw_rad = servo_desired_yaw_rad_;
 
   pub_debug_.publish(msg_debug_);
   return true;

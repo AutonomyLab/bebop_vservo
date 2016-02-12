@@ -7,6 +7,7 @@
   <arg name="enable_topic" default="vservo/enable" />
   <arg name="target_topic" default="vservo/target" />
   <arg name="debug_topic" default="vservo/debug" />
+  <arg name="plot" default="false" />
 
   <node name="bebop_vservo_node" type="bebop_vservo_node" pkg="bebop_vservo" output="$(arg output)">
     <rosparam command="load" file="$(arg param_file)" />
@@ -16,4 +17,14 @@
     <remap from="debug" to="$(arg debug_topic)" />
     <remap from="target" to="$(arg target_topic)" />
   </node>
+
+  <group if="$(arg plot)">
+    <node name="rqt_plot_servo" type="rqt_plot" pkg="rqt_plot" output="log"
+      args="--clear-config $(arg debug_topic)/d_raw_bb
+      $(arg debug_topic)/task_err[0]
+      $(arg debug_topic)/task_err[1]
+      $(arg debug_topic)/task_err[2]
+      $(arg debug_topic)/desired_depth
+      $(arg debug_topic)/desired_yaw_rad" />
+  </group>
 </launch>

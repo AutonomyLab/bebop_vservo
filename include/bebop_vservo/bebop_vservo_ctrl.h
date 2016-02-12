@@ -72,6 +72,7 @@ public:
 private:
   bool enabled_;
   bool servo_inited_;
+  bool force_reinit_;
 
   ros::NodeHandle nh_;
   ros::NodeHandle nh_priv_;
