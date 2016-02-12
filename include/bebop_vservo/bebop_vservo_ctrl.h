@@ -97,7 +97,8 @@ private:
   double cam_tilt_rad_;
 
   // Visp
-  vpServo vp_task_;
+  boost::shared_ptr<vpServo> vp_task_ptr_;
+
   vpFeaturePoint fpd_[4];
   vpFeaturePoint fp_[4];
   vpCameraParameters vp_cam_;

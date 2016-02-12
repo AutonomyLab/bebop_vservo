@@ -2,7 +2,7 @@
 #include <cmath>
 
 // boost
-#include <boost/thread/lock_guard.hpp>
+#include <boost/make_shared.hpp>
 
 // ros
 #include <angles/angles.h>
@@ -31,7 +31,8 @@ BebopVServoCtrl::BebopVServoCtrl(ros::NodeHandle &nh)
     target_recv_time_(ros::Time(0)),
     fov_x_(0.0),
     fov_y_(0.0),
-    cam_tilt_rad_(0.0)
+    cam_tilt_rad_(0.0),
+    vp_task_ptr_()  // set to null
 {
   UpdateParams();
   util::ResetCmdVel(msg_cmd_vel_);
@@ -83,6 +84,9 @@ void BebopVServoCtrl::CameraCallback(const sensor_msgs::CameraInfoConstPtr& cinf
 
   if (is_valid_roi && (!servo_inited_ || target_cptr_->reinit))
   {
+    // This will re-set all internal params of the task
+    vp_task_ptr_ = boost::make_shared<vpServo>();
+
     servo_desired_depth_ = target_cptr_->desired_depth;
     servo_desired_yaw_rad_ = target_cptr_->desired_yaw_rad;
     servo_target_height_ = target_cptr_->target_height;
@@ -95,6 +99,7 @@ void BebopVServoCtrl::CameraCallback(const sensor_msgs::CameraInfoConstPtr& cinf
                     "Target d2 ground: " << servo_target_dist_ground_
                     );
 
+    ROS_ERROR_STREAM("[VSER] Target ROI [x,y,w,h]: " << roi.x_offset << " " << roi.y_offset << " " << roi.width << " " << roi.height);
     vp_cam_ = visp_bridge::toVispCameraParameters(*cinfo_msg_ptr);
     vp_cam_.printParameters();
     //lambda_adapt.initStandard(4.0, 0.4, 40.0);
@@ -126,15 +131,17 @@ void BebopVServoCtrl::CameraCallback(const sensor_msgs::CameraInfoConstPtr& cinf
       fpd_[i].set_xyZ(p_img[0], p_img[1], cP[2]);
     }
 
+    ROS_ASSERT(vp_task_ptr_);
+
     for (uint32_t i = 0; i < 4; i++)
     {
-      vp_task_.addFeature(fp_[i], fpd_[i]);
+      vp_task_ptr_->addFeature(fp_[i], fpd_[i]);
     }
 
-    vp_task_.setServo(vpServo::EYEINHAND_CAMERA);
-    vp_task_.setInteractionMatrixType(vpServo::MEAN, vpServo::PSEUDO_INVERSE);
-    vp_task_.setLambda(vp_gain_);
-    vp_task_.print();
+    vp_task_ptr_->setServo(vpServo::EYEINHAND_CAMERA);
+    vp_task_ptr_->setInteractionMatrixType(vpServo::MEAN, vpServo::PSEUDO_INVERSE);
+    vp_task_ptr_->setLambda(vp_gain_);
+    vp_task_ptr_->print();
     servo_inited_ = true;
   }
 
@@ -192,7 +199,7 @@ void BebopVServoCtrl::Spin()
 
 bool BebopVServoCtrl::Update()
 {
-  if (!servo_inited_)
+  if (!servo_inited_ || !vp_task_ptr_)
   {
     ROS_WARN_THROTTLE(1, "[VSER] Servo task has not been initialized yet.");
     return false;
@@ -234,9 +241,9 @@ bool BebopVServoCtrl::Update()
   {
     fp_[i].set_Z(z1_m);
   }
-  vp_v_ = vp_task_.computeControlLaw();
+  vp_v_ = vp_task_ptr_->computeControlLaw();
   //vp_task_.print();
-  ROS_WARN_STREAM("V_SERVO: " << vp_v_.transpose());
+  ROS_DEBUG_STREAM("V_SERVO: " << vp_v_.transpose());
 
   // Here we should convert from Camera (Visp) coordinates to Bebop Coordinates
   // TODO: Consider camera tilt
@@ -266,7 +273,11 @@ bool BebopVServoCtrl::Update()
   msg_debug_.d_raw_bb = z1_m;
   msg_debug_.target_height = servo_target_height_;
   msg_debug_.target_grounddist = servo_target_dist_ground_;
+  for (uint32_t i = 0; i < 6; ++i)
+    msg_debug_.task_err[i] = vp_v_.data[i];
+
   pub_debug_.publish(msg_debug_);
+  return true;
 }
 
 }  // namespace bebop_servo

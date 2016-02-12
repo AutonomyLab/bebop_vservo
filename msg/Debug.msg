@@ -19,3 +19,5 @@ float64 vref_yaw
 
 float64 vest_x
 float64 vest_y
+
+float64[6] task_err
