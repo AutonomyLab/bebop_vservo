@@ -2,8 +2,8 @@
 Changelog for package bebop_vservo
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+1.1.0 (2016-02-12)
+------------------
 * Major refactoring and changes
   - First robust version
   - Yaw is directly being controlled via image error (requires vel_ctrl
