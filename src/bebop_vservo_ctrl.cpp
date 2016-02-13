@@ -68,8 +68,13 @@ void BebopVServoCtrl::TargetCallback(const TargetConstPtr target_msg_ptr)
 
 void BebopVServoCtrl::CameraOrientationCallback(const bebop_msgs::Ardrone3CameraStateOrientationConstPtr& cam_ori_ptr)
 {
-  cam_tilt_rad_ = -angles::from_degrees(cam_ori_ptr->tilt);
-  ROS_DEBUG_STREAM("[VSER] Bebop camera's new tilt: " << -cam_ori_ptr->tilt);
+  const double& new_tilt_angle_rad = -angles::from_degrees(cam_ori_ptr->tilt);
+  if (fabs(cam_tilt_rad_ - new_tilt_angle_rad) > 0.01)
+  {
+    // TEMP
+    ROS_WARN_STREAM("[VSER] Bebop camera's new tilt: " << -cam_ori_ptr->tilt);
+  }
+  cam_tilt_rad_ = new_tilt_angle_rad;
 }
 
 void BebopVServoCtrl::BebopAttitudeCallback(const bebop_msgs::Ardrone3PilotingStateAttitudeChangedConstPtr &att_ptr)
@@ -290,9 +295,19 @@ bool BebopVServoCtrl::Update()
   util::ResetCmdVel(msg_cmd_vel_);
 
   // No clamp/filter here
-  msg_cmd_vel_.linear.x = vp_v_[2];
+  // Map to Bebop's frame from camera's frame
+
+  const double& vx_cam = vp_v_[2];
+  const double& vz_cam = -vp_v_[1];
+
+  // TODO: Check the freshness of tilt!
+  msg_cmd_vel_.linear.x =  vx_cam * cos(cam_tilt_rad_) + vz_cam * sin(cam_tilt_rad_);
+  msg_cmd_vel_.linear.z = -vx_cam * sin(cam_tilt_rad_) + vz_cam * cos(cam_tilt_rad_);
   msg_cmd_vel_.linear.y = -vp_v_[0];
-  msg_cmd_vel_.linear.z = -vp_v_[1];
+
+//  msg_cmd_vel_.linear.x = vp_v_[2];
+//  msg_cmd_vel_.linear.y = -vp_v_[0];
+//  msg_cmd_vel_.linear.z = -vp_v_[1];
 
   // We can't control all four DOF of the vehicle
   msg_cmd_vel_.angular.z = servo_desired_yaw_rad_;
