@@ -106,8 +106,12 @@ private:
   // Visp
   boost::shared_ptr<vpServo> vp_task_ptr_;
 
-  vpFeaturePoint fpd_[4];
-  vpFeaturePoint fp_[4];
+  //vpFeaturePoint fpd_[4];
+  //vpFeaturePoint fp_[4];
+
+  std::vector<vpFeaturePoint> fpd_;
+  std::vector<vpFeaturePoint> fp_;
+
   vpCameraParameters vp_cam_;
   double vp_gain_;
   vpColVector vp_v_;
@@ -116,6 +120,7 @@ private:
   // These are set by the user when target is first received or when reinit=true
   double servo_desired_depth_;
   double servo_target_height_;
+  double servo_target_width_;
   double servo_target_dist_ground_;
   double servo_desired_yaw_rad_;
 

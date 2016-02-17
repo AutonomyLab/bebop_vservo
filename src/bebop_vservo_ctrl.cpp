@@ -72,7 +72,7 @@ void BebopVServoCtrl::CameraOrientationCallback(const bebop_msgs::Ardrone3Camera
   if (fabs(cam_tilt_rad_ - new_tilt_angle_rad) > 0.01)
   {
     // TEMP
-    ROS_WARN_STREAM("[VSER] Bebop camera's new tilt: " << -cam_ori_ptr->tilt);
+    ROS_DEBUG_STREAM("[VSER] Bebop camera's new tilt: " << -cam_ori_ptr->tilt);
   }
   cam_tilt_rad_ = new_tilt_angle_rad;
 }
@@ -182,11 +182,18 @@ bool BebopVServoCtrl::Update()
   {
     // This will re-set all internal params of the task
     vp_task_ptr_ = boost::make_shared<vpServo>();
+    fp_.clear();
+    fpd_.clear();
+    fp_.resize(4);
+    fpd_.resize(4);
+
+
     servo_inited_ = false;
 
     servo_desired_depth_ = target_cptr_->desired_depth;
     servo_desired_yaw_rad_ = target_cptr_->desired_yaw_rad;
-    servo_target_height_ = target_cptr_->target_height;
+    servo_target_height_ = target_cptr_->target_height_m;
+    servo_target_width_ = target_cptr_->target_width_m;
     servo_target_dist_ground_ = target_cptr_->target_distance_ground;
 
     ROS_WARN_STREAM("[VSER] (re-)init " <<
@@ -195,6 +202,7 @@ bool BebopVServoCtrl::Update()
                     " Desired depth: " << servo_desired_depth_ <<
                     " Desired yaw: " << angles::to_degrees(servo_desired_yaw_rad_) <<
                     " Target height: " << servo_target_height_ <<
+                    " Target width: " << servo_target_width_ <<
                     " Target d2 ground: " << servo_target_dist_ground_
                     );
 
@@ -202,18 +210,24 @@ bool BebopVServoCtrl::Update()
 
     //lambda_adapt.initStandard(4.0, 0.4, 40.0);
 
-    const double nlen = (roi.width + roi.height) / 2.0;
+    ROS_ASSERT(fp_.size() == 4);
     vpFeatureBuilder::create(fp_[0], vp_cam_, vpImagePoint(roi.y_offset, roi.x_offset));
     vpFeatureBuilder::create(fp_[1], vp_cam_, vpImagePoint(roi.y_offset, roi.x_offset + roi.width));
     vpFeatureBuilder::create(fp_[2], vp_cam_, vpImagePoint(roi.y_offset + roi.height, roi.x_offset + roi.width));
     vpFeatureBuilder::create(fp_[3], vp_cam_, vpImagePoint(roi.y_offset + roi.height, roi.x_offset));
 
     vpPoint point[4];
-    const double tw = servo_target_height_ / 2.0;
-    point[0].setWorldCoordinates(-tw, -tw, 0);
-    point[1].setWorldCoordinates( tw, -tw, 0);
-    point[2].setWorldCoordinates( tw,  tw, 0);
-    point[3].setWorldCoordinates(-tw,  tw, 0);
+    const double h2 = servo_target_height_ / 2.0;
+    const double w2 = servo_target_width_ / 2.0;
+    point[0].setWorldCoordinates(-w2, -h2, 0);
+    point[1].setWorldCoordinates( w2, -h2, 0);
+    point[2].setWorldCoordinates( w2,  h2, 0);
+    point[3].setWorldCoordinates(-w2,  h2, 0);
+
+//    point[0].setWorldCoordinates(-h2, -w2, 0);
+//    point[1].setWorldCoordinates( h2, -w2, 0);
+//    point[2].setWorldCoordinates( h2,  w2, 0);
+//    point[3].setWorldCoordinates(-h2,  w2, 0);
 
     vpHomogeneousMatrix cMo;
     vpTranslationVector cto(0, 0, servo_desired_depth_);
@@ -231,6 +245,7 @@ bool BebopVServoCtrl::Update()
     }
 
     ROS_ASSERT(vp_task_ptr_);
+    ROS_ASSERT((fp_.size() == 4) && (fpd_.size() == 4));
 
     for (uint32_t i = 0; i < 4; i++)
     {
@@ -260,12 +275,12 @@ bool BebopVServoCtrl::Update()
   double d1_m = servo_target_height_ * sin(M_PI_2 - fov_y_/2.0 + sigma_2 - cam_tilt_rad_) / sin(beta_rad);
   double z1_m = d1_m * sin(M_PI_2 + fov_y_/2.0  - cam_tilt_rad_ - sigma_1);
 
+  ROS_ASSERT(fp_.size() == 4);
 
   vpFeatureBuilder::create(fp_[0], vp_cam_, vpImagePoint(roi.y_offset, roi.x_offset));
   vpFeatureBuilder::create(fp_[1], vp_cam_, vpImagePoint(roi.y_offset, roi.x_offset + roi.width));
   vpFeatureBuilder::create(fp_[2], vp_cam_, vpImagePoint(roi.y_offset + roi.height, roi.x_offset + roi.width));
   vpFeatureBuilder::create(fp_[3], vp_cam_, vpImagePoint(roi.y_offset + roi.height, roi.x_offset));
-
 
   for (uint32_t i = 0; i < 4; i++)
   {
