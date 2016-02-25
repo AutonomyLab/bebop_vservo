@@ -32,6 +32,7 @@ BebopVServoCtrl::BebopVServoCtrl(ros::NodeHandle &nh)
     sub_enable_(nh_.subscribe("enable", 1, &BebopVServoCtrl::EnableCallback, this)),
     pub_cmd_vel_(nh_.advertise<geometry_msgs::Twist>("cmd_vel", 10)),
     pub_debug_(nh_.advertise<bebop_vservo::Debug>("debug", 30)),
+    pub_land_(nh_.advertise<std_msgs::Empty>("land", 10)),
     target_recv_time_(ros::Time(0)),
     bebop_recv_time_(ros::Time(0)),
     fov_x_(0.0),
@@ -50,6 +51,12 @@ void BebopVServoCtrl::UpdateParams()
   util::GetParam(nh_priv_, "servo_gain", vp_gain_, 0.4);
   util::GetParam(nh_priv_, "update_freq", param_update_freq_, 30.0);
   util::GetParam(nh_priv_, "cam_tilt", cam_tilt_rad_, 0.0);
+  util::GetParam(nh_priv_, "land_on_small_error", param_land_on_small_error_, false);
+  util::GetParam(nh_priv_, "error_v_threshold", param_error_v_threshold_, 0.1);
+  util::GetParam(nh_priv_, "error_angle_threshold", param_error_angle_threshold_, 10.0);
+  param_error_angle_threshold_ = angles::from_degrees(param_error_angle_threshold_);
+
+
   cam_tilt_rad_ = angles::from_degrees(cam_tilt_rad_);
 }
 
@@ -166,12 +173,33 @@ bool BebopVServoCtrl::Update()
       (roi.x_offset + roi.width >= cam_model_.fullResolution().width) ||
       (roi.y_offset + roi.height >= cam_model_.fullResolution().height))
   {
+    ROS_WARN_STREAM_THROTTLE(1, "[VSER] roi " << roi.x_offset << " " << roi.y_offset << " " << roi.width << " " << roi.height);
     is_valid_roi = false;
+  }
+
+  // Experimental
+  // Our base pattern is a square, rectangles may make the system unstable
+  if (roi.width != roi.height)
+  {
+    int32_t roi_wh = std::max(roi.width, roi.height);
+    roi.x_offset -= (roi_wh - roi.width) / 2;
+    roi.y_offset -= (roi_wh - roi.height) / 2;
+    roi.width = roi_wh;
+    roi.height = roi_wh;
+
+    roi.x_offset = util::clamp<int32_t>(roi.x_offset, 0, cam_model_.fullResolution().width - 1);
+    roi.y_offset = util::clamp<int32_t>(roi.y_offset, 0, cam_model_.fullResolution().height - 1);
+    const int32_t x2 = util::clamp<int32_t>(roi.x_offset + roi.width, 0, cam_model_.fullResolution().width - 1);
+    const int32_t y2 = util::clamp<int32_t>(roi.y_offset + roi.height, 0, cam_model_.fullResolution().height - 1);
+    roi.width = x2 - roi.x_offset;
+    roi.height = y2 - roi.y_offset;
   }
 
   if (!is_valid_roi)
   {
     ROS_WARN_THROTTLE(1, "[VSER] ROI is too old or not valid. Disabling visual servo!");
+    ROS_WARN_STREAM_THROTTLE(1, "[VSER] Latency " << (ros::Time::now() - target_recv_time_).toSec());
+
     // Experimental
     enabled_ = false;
     servo_inited_ = false;
@@ -287,6 +315,7 @@ bool BebopVServoCtrl::Update()
     fp_[i].set_Z(z1_m);
   }
   vp_v_ = vp_task_ptr_->computeControlLaw();
+
   //vp_task_.print();
   ROS_DEBUG_STREAM("V_SERVO: " << vp_v_.transpose());
 
@@ -315,6 +344,11 @@ bool BebopVServoCtrl::Update()
   const double& vx_cam = vp_v_[2];
   const double& vz_cam = -vp_v_[1];
 
+  const bool do_land = param_land_on_small_error_ &&
+      (fabs(vx_cam) < param_error_v_threshold_) &&
+      (fabs(vz_cam) < param_error_v_threshold_) &&
+      (fabs(yaw_image_err_raw) < param_error_angle_threshold_);
+
   // TODO: Check the freshness of tilt!
   msg_cmd_vel_.linear.x =  vx_cam * cos(cam_tilt_rad_) + vz_cam * sin(cam_tilt_rad_);
   msg_cmd_vel_.linear.z = -vx_cam * sin(cam_tilt_rad_) + vz_cam * cos(cam_tilt_rad_);
@@ -326,6 +360,14 @@ bool BebopVServoCtrl::Update()
 
   // We can't control all four DOF of the vehicle
   msg_cmd_vel_.angular.z = servo_desired_yaw_rad_;
+
+  if (do_land)
+  {
+    ROS_WARN("[VSER] land on small error has been activated");
+    std_msgs::Empty empty_msg;
+    util::ResetCmdVel(msg_cmd_vel_);
+    pub_land_.publish(empty_msg);
+  }
 
   pub_cmd_vel_.publish(msg_cmd_vel_);
 

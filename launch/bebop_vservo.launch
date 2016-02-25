@@ -7,6 +7,7 @@
   <arg name="enable_topic" default="vservo/enable" />
   <arg name="target_topic" default="vservo/target" />
   <arg name="debug_topic" default="vservo/debug" />
+  <arg name="land_topic" default="bebop/land" />
   <arg name="plot" default="false" />
 
   <node name="bebop_vservo_node" type="bebop_vservo_node" pkg="bebop_vservo" output="$(arg output)">
@@ -16,6 +17,7 @@
     <remap from="enable" to="$(arg enable_topic)" />
     <remap from="debug" to="$(arg debug_topic)" />
     <remap from="target" to="$(arg target_topic)" />
+    <remap from="land" to="$(arg land_topic)" />
   </node>
 
   <group if="$(arg plot)">

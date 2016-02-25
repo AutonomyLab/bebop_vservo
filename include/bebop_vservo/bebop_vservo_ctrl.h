@@ -11,6 +11,7 @@
 #include <geometry_msgs/Twist.h>
 #include <image_geometry/pinhole_camera_model.h>
 #include <std_msgs/Bool.h>
+#include <std_msgs/Empty.h>
 
 #include "bebop_msgs/Ardrone3PilotingStateAttitudeChanged.h"
 #include "bebop_msgs/Ardrone3CameraStateOrientation.h"
@@ -41,6 +42,11 @@ inline void ResetCmdVel(geometry_msgs::Twist& v)
   v.angular.x = 0.0;
   v.angular.y = 0.0;
   v.angular.z = 0.0;
+}
+
+template <typename T> inline T clamp (T x, T a, T b)
+{
+    return ((x) > (a) ? ((x) < (b) ? (x) : (b)) : (a));
 }
 
 template<typename T>
@@ -87,6 +93,7 @@ private:
 
   ros::Publisher pub_debug_;
   ros::Publisher pub_cmd_vel_;
+  ros::Publisher pub_land_;
 
   geometry_msgs::Twist msg_cmd_vel_;
   bebop_vservo::Debug msg_debug_;
@@ -126,6 +133,9 @@ private:
 
   // params
   double param_update_freq_;
+  double param_error_v_threshold_;
+  double param_error_angle_threshold_;
+  bool param_land_on_small_error_;
 
   void Reset();
   bool Update();

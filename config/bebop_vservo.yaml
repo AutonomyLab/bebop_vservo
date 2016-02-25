@@ -4,3 +4,8 @@ servo_gain: 0.4
 update_freq: 30.0
 height_target: 0.5
 cam_tilt: 0
+
+land_on_small_error: false
+error_v_threshold: 0.1
+# in deg
+error_angle_threshold: 10.0
