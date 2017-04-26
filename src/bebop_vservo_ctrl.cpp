@@ -24,9 +24,9 @@ BebopVServoCtrl::BebopVServoCtrl(ros::NodeHandle &nh)
     nh_(nh),
     nh_priv_("~"),
     sub_caminfo_(nh.subscribe("bebop/camera_info", 1, &BebopVServoCtrl::CameraCallback, this)),
-    sub_cam_orientation_(nh_.subscribe("bebop/states/ARDrone3/CameraState/Orientation", 10
+    sub_cam_orientation_(nh_.subscribe("bebop/states/ardrone3/CameraState/Orientation", 10
                                       , &BebopVServoCtrl::CameraOrientationCallback, this)),
-    sub_bebop_att_(nh_.subscribe("bebop/states/ARDrone3/PilotingState/AttitudeChanged", 10,
+    sub_bebop_att_(nh_.subscribe("bebop/states/ardrone3/PilotingState/AttitudeChanged", 10,
                                  &BebopVServoCtrl::BebopAttitudeCallback, this)),
     sub_roi_(nh_.subscribe("target", 1, &BebopVServoCtrl::TargetCallback, this)),
     sub_enable_(nh_.subscribe("enable", 1, &BebopVServoCtrl::EnableCallback, this)),
